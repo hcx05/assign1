@@ -1,90 +1,102 @@
 #
-#  Sample Makefile for C++ programs 
-#  Designed for the OOP class
-#  by Tsai-Yen Li (li@cs.nccu.edu.tw) 08/08/96
+# Usage:
+# 'make'        build executable file 'main'
+# 'make clean'  removes all .o and executable files
+# 'make run'    runs the executable file 'main'
 #
 
 # the name of this package. 
 # The library and tar file, if any, will be named after it.
-PACKAGE  = Cards
-# The executable program
-TARGET   = CardTest
-# The C++ source programs (.cc) [multiple files]
-SOURCES  = AnsiPrint Cards 
-# The C++ source program for testing your implementation
-TEST     = CardTest
+PACKAGE  = Card
 
-HOSTTYPE = $(shell arch)
-O_DIR    = O_$(HOSTTYPE)
-SYSDIR   = /usr/local
-CLASSDIR = $(SYSDIR)/class/oop
-BASEDIR  = .
-INCDIR   = $(BASEDIR)/include #-I$(SYSDIR)/lib/g++-include 
-LIBDIR   = -L$(BASEDIR)/lib -L/usr/openwin/lib -L/usr/ucblib
-LIBS     = $(LIBDIR) -lm -lc #-lucb  -liostream
+# define library paths in addition to /usr/lib
+#   if I wanted to include libraries not in /usr/lib I'd specify
+#   their path using -Lpath, something like:
+LFLAGS =
+
+# define output directory
+OUTPUT	:= output
+# define source directory
+SRC		:= src
+# define object directory
+OBJ_DIR	:= obj
 
 # You may not need to modify anything below
 
-CXX      = g++
-CXXFLAGS = -g -Wall -I$(INCDIR) #-D__STDC__ 
-TARG     = $(TARGET)_$(HOSTTYPE)
-LIB      = lib$(PACKAGE)_$(HOSTTYPE).a
+# define the Cpp compiler to use
+CXX = g++
+# define any compile-time flags
+CXXFLAGS	:= -std=c++17 -Wall -Wno-unused-variable -g
 
-SRCS     = ${SOURCES:%=%.cc}
-OBJS     = ${SRCS:%.cc=$(O_DIR)/%.o}
-HEADERS  = ${SRCS:%.cc=%.h} Cards.h
-TESTSRC  = ${TEST:%=%.cc}
-TESTOBJ  = ${TESTSRC:%.cc=$(O_DIR)/%.o}
-#MAKEDEP  = $(CLASSDIR)/bin/makedepend
-MAKEDEP  = makedepend
+ifeq ($(OS),Windows_NT)
+MAIN	:= $(PACKAGE).exe
+SOURCEDIRS	:= $(SRC)
+FIXPATH = $(subst /,\,$1)
+RM			:= del /q /f
+MD	:= mkdir
+RD	:= rmdir
+else
+MAIN	:= $(PACKAGE)
+SOURCEDIRS	:= $(shell find $(SRC) -type d)
+FIXPATH = $1
+RM = rm -f
+MD	:= mkdir -p
+RD	:= rm -rf
+endif
 
-$(TARG) : $(O_DIR) $(OBJS) $(TESTOBJ)
-	$(CXX) -o $@ $(CXXFLAGS) $(OBJS) $(TESTOBJ) $(LIBS) 
+# define the C source files
+SOURCES		:= $(wildcard $(patsubst %,%/*.cpp, $(SOURCEDIRS)))
+# define the C object files
+OBJECTS		:= $(SOURCES:$(SRC)/%.cpp=$(OBJ_DIR)/%.o)
+# define the dependency output files
+DEPS		:= $(SOURCES:$(SRC)/%.cpp=$(OBJ_DIR)/%.d)
 
-$(O_DIR) :
-	mkdir $@
+#
+# The following part of the makefile is generic; it can be used to
+# build any executable just by changing the definitions above and by
+# deleting dependencies appended to the file from 'make depend'
+#
 
-lib : $(O_DIR) $(LIB)
-	@echo $@ Built
+OUTPUTMAIN	:= $(call FIXPATH,$(OUTPUT)/$(MAIN))
 
-$(LIB) : $(OBJS)
-	rm -f $(LIB)
-	ar cr $@ $(OBJS)
-	ranlib $@
+all:  $(OBJ_DIR) $(OUTPUT) $(MAIN)
+	@echo Executing 'all' complete!
 
-$(O_DIR)/%.o: %.cc
-	$(CXX) $(CXXFLAGS) -c -o $@ $<
+OBJ_SUBDIRS := $(patsubst $(SRC)/%,$(OBJ_DIR)/%,$(SOURCEDIRS))
 
-clean: 
-	rm -f $(OBJS) $(TESTOBJ) $(TARG) core* *~ Makefile.bak 
-	rmdir $(O_DIR)
+$(OBJ_DIR): $(OBJ_SUBDIRS)
+	$(MD) $(OBJ_DIR) $(OBJ_SUBDIRS)
 
-tags: 
-	etags $(SRCS) $(HEADERS)
+$(OBJ_SUBDIRS):
+	$(MD) $@
 
-ztar:
-	tar zcvf $(PACKAGE).tgz Makefile $(SRCS) $(HEADERS) $(TESTSRC) 
+$(OUTPUT):
+	$(MD) $(OUTPUT)
 
-ci:
-	ci -l Makefile $(SRCS) $(HEADERS) $(TESTSRC) 
+$(MAIN): $(OBJECTS)
+	$(CXX) $(CXXFLAGS) -o $(OUTPUTMAIN) $(OBJECTS) $(LFLAGS)
 
-depend : 
-	$(MAKEDEP) -p$(O_DIR)/ -I$(INCDIR) $(SRCS) $(TESTSRC)
+# include all .d files
+-include $(DEPS)
 
-# DO NOT DELETE THIS LINE -- make depend depends on it.
+# this is a suffix replacement rule for building .o's and .d's from .c's
+# it uses automatic variables $<: the name of the prerequisite of
+# the rule(a .c file) and $@: the name of the target of the rule (a .o file)
+# -MMD generates dependency output files same name as the .o file
+# (see the gnu make manual section about automatic variables)
+.suffix: .o .cpp
+$(OBJ_DIR)/%.o: $(SRC)/%.cpp
+	$(CXX) $(CXXFLAGS) $(INCLUDES) -c -MMD $<  -o $@
 
-O_i86pc/AnsiPrint.o: AnsiPrint.h
-O_i86pc/CardTest.o: /usr/include/stdio.h /usr/include/sys/feature_tests.h
-O_i86pc/CardTest.o: /usr/include/sys/ccompile.h /usr/include/sys/isa_defs.h
-O_i86pc/CardTest.o: /usr/include/iso/stdio_iso.h /usr/include/sys/va_list.h
-O_i86pc/CardTest.o: /usr/include/stdio_tag.h /usr/include/stdio_impl.h
-O_i86pc/CardTest.o: /usr/include/iso/stdio_c99.h /usr/include/stdlib.h
-O_i86pc/CardTest.o: /usr/include/iso/stdlib_iso.h
-O_i86pc/CardTest.o: /usr/include/iso/stdlib_c99.h /usr/include/strings.h
-O_i86pc/CardTest.o: /usr/include/sys/types.h /usr/include/sys/machtypes.h
-O_i86pc/CardTest.o: /usr/include/ia32/sys/machtypes.h
-O_i86pc/CardTest.o: /usr/include/sys/int_types.h /usr/include/sys/select.h
-O_i86pc/CardTest.o: /usr/include/sys/time_impl.h /usr/include/sys/time.h
-O_i86pc/CardTest.o: /usr/include/sys/time.h /usr/include/string.h
-O_i86pc/CardTest.o: /usr/include/iso/string_iso.h /usr/include/assert.h
-O_i86pc/CardTest.o: AnsiPrint.h Cards.h
+.PHONY: clean
+clean:
+	$(RM) $(OUTPUTMAIN)
+	$(RM) $(call FIXPATH,$(OBJECTS))
+	$(RM) $(call FIXPATH,$(DEPS))
+	$(RD) $(OBJ_DIR)
+	$(RD) $(OUTPUT)
+	@echo Cleanup complete!
+
+run: all
+	./$(OUTPUTMAIN)
+	@echo Executing 'run: all' complete!
